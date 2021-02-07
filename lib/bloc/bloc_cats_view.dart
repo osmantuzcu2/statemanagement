@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:statemanagement/bloc/cat.dart';
 import 'package:statemanagement/bloc/cats_cubit.dart';
 import 'package:statemanagement/bloc/cats_repository.dart';
 import 'package:statemanagement/bloc/cats_state.dart';
@@ -10,10 +11,22 @@ class BlocCatsView extends StatefulWidget {
 }
 
 class _BlocCatsViewState extends State<BlocCatsView> {
+  BuildContext _context;
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      _context.bloc<CatsCubit>().getCats();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (context) => CatsCubit(SampleCatsRepository()),
+      create: (c) {
+        return CatsCubit(SampleCatsRepository());
+      },
       child: buildScaffold(context),
     );
   }
@@ -23,18 +36,20 @@ class _BlocCatsViewState extends State<BlocCatsView> {
           title: Text("Hello"),
         ),
         body: BlocConsumer<CatsCubit, CatsState>(
-          listener: (context, state) {
+          listener: (c, state) {
             if (state is CatsError) {
-              Scaffold.of(context).showSnackBar(SnackBar(content: Text(state.message)));
+              Scaffold.of(context)
+                  .showSnackBar(SnackBar(content: Text(state.message)));
             }
           },
-          builder: (context, state) {
+          builder: (c, state) {
+            _context = c;
             if (state is CatsInitial) {
               return buildCenterInitialChild(context);
             } else if (state is CatsLoading) {
               return buildCenterLoading();
             } else if (state is CatsCompleted) {
-              return buildListViewCats(state);
+              return buildListViewCats(state, _context);
             } else {
               return buildError(state);
             }
@@ -47,13 +62,36 @@ class _BlocCatsViewState extends State<BlocCatsView> {
     return Text(error.message);
   }
 
-  ListView buildListViewCats(CatsCompleted state) {
-    return ListView.builder(
-      itemBuilder: (context, index) => ListTile(
-        title: Image.network(state.response[index].imageUrl),
-        subtitle: Text(state.response[index].description),
-      ),
-      itemCount: state.response.length,
+  Stack buildListViewCats(CatsCompleted state, BuildContext context) {
+    return Stack(
+      children: [
+        ListView.builder(
+          itemBuilder: (context, index) => ListTile(
+            title: Image.network(state.response[index].imageUrl),
+            subtitle: Text(state.response[index].description),
+          ),
+          itemCount: state.response.length,
+        ),
+        Row(
+          children: [
+            FloatingActionButton(
+              child: Icon(Icons.add),
+              onPressed: () {
+                context.bloc<CatsCubit>().addCat(Cat(
+                    statusCode: 100,
+                    description: "test",
+                    imageUrl: "https://http.cat/100"));
+              },
+            ),
+            FloatingActionButton(
+              child: Icon(Icons.clear),
+              onPressed: () {
+                context.bloc<CatsCubit>().clearAll();
+              },
+            ),
+          ],
+        )
+      ],
     );
   }
 
